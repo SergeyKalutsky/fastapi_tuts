@@ -1,17 +1,21 @@
+import sys
+import requests
 from time import sleep
- 
- 
+
+base_url = 'http://127.0.0.1:8000'
+
 def create_board():
     return([['.', '.', '.'],
             ['.', '.', '.'],
             ['.', '.', '.']])
  
  
-def print_board(board):
-    print('  0 1 2')
+def board_to_string(board):
+    string_board = '  0 1 2\n'
     for i, row in enumerate(board):
-        print(i, ' '.join(row))
-    
+        string_board += str(i) + ' ' + ' '.join(row) + '\n'
+    return string_board[:-1]
+ 
  
 def row_win(board, player):
     for x in range(len(board)):
@@ -78,20 +82,36 @@ def place_board(col, row, sign, board):
  
 def play_game():
     board, winner = create_board(), False
-    print_board(board)
+    print(board_to_string(board))
     sleep(2)
  
-    sign = 'X'
-    while not winner:
+    res = requests.get(base_url + '/register_user')
+    data = res.json()
+    if data['status'] != 'ok':
+        print('К сожалению, пока играть нельзя')
+        return
+    sign = data['message']
+    while True:
+        res = requests.post(base_url + '/play', json={'player': sign, 'board': board})
+        winner = evaluate(board)
+        if winner: 
+            print('Победил:', winner + '                   ', end='\r')
+            sleep(1)
+            continue
+        data = res.json()
+        if data['status'] == 'wait':
+            board = data['board']
+            sys.stdout.write("\033[4F")
+            print(board_to_string(board) + '\nОжидаем ход другого игрока...', end="\r")
+            sleep(1)
+            continue
+        print()
         col = int(input('Выберите ряд: '))
         row = int(input('Выберите столбец: '))
         board, error = place_board(col, row, sign, board)
-        print_board(board)
+        print(board_to_string(board) + '\nОжидаем ход другого игрока...', end="\r")
         if error:
            print(error) 
            continue
-        sign = 'X' if sign == 'O' else 'O'
-        winner = evaluate(board)
-    print(winner)
  
 play_game()
